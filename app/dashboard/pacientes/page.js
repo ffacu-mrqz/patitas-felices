@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import {
   Search,
@@ -21,7 +21,9 @@ import {
   Thermometer,
   ClipboardList,
   Printer,
-  Pill
+  Pill,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react'
 
 export default function PacientesPage() {
@@ -49,6 +51,8 @@ export default function PacientesPage() {
   const [edad, setEdad] = useState('')
   const [tutor, setTutor] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [fotoFile, setFotoFile] = useState(null)
+  const [fotoPreview, setFotoPreview] = useState(null)
 
   // Estado Formulario Nueva Consulta
   const [motivo, setMotivo] = useState('')
@@ -65,11 +69,7 @@ export default function PacientesPage() {
   ])
   const [indicacionesGenerales, setIndicacionesGenerales] = useState('')
 
-  useEffect(() => {
-    fetchPacientes()
-  }, [])
-
-  const fetchPacientes = async () => {
+  const fetchPacientes = useCallback(async () => {
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -84,6 +84,38 @@ export default function PacientesPage() {
     } finally {
       setLoading(false)
     }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchPacientes()
+  }, [fetchPacientes])
+
+  // --- MANEJO DE FOTO Y SUBIDA A SUPABASE STORAGE ---
+  const handleFotoChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setFotoFile(file)
+      setFotoPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const uploadFotoMascota = async (file) => {
+    if (!file) return null
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `pacientes/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('pacientes-fotos')
+      .upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage
+      .from('pacientes-fotos')
+      .getPublicUrl(filePath)
+
+    return data.publicUrl
   }
 
   const handleCreatePaciente = async (e) => {
@@ -91,6 +123,11 @@ export default function PacientesPage() {
     setSubmitting(true)
 
     try {
+      let fotoUrl = null
+      if (fotoFile) {
+        fotoUrl = await uploadFotoMascota(fotoFile)
+      }
+
       const { data, error } = await supabase
         .from('pacientes')
         .insert([
@@ -101,6 +138,7 @@ export default function PacientesPage() {
             edad: edad !== '' ? parseInt(edad, 10) : null,
             tutor: tutor.trim(),
             telefono: telefono.trim() || null,
+            foto_url: fotoUrl
           },
         ])
         .select()
@@ -111,12 +149,7 @@ export default function PacientesPage() {
         setPacientes((prev) => [data[0], ...prev])
       }
 
-      setNombre('')
-      setEspecie('Perro')
-      setRaza('')
-      setEdad('')
-      setTutor('')
-      setTelefono('')
+      resetPacienteForm()
       setShowModal(false)
     } catch (err) {
       console.error('Error al guardar paciente:', err)
@@ -124,6 +157,17 @@ export default function PacientesPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const resetPacienteForm = () => {
+    setNombre('')
+    setEspecie('Perro')
+    setRaza('')
+    setEdad('')
+    setTutor('')
+    setTelefono('')
+    setFotoFile(null)
+    setFotoPreview(null)
   }
 
   const handleDeletePaciente = async (id, nombreMascota) => {
@@ -203,7 +247,7 @@ export default function PacientesPage() {
     }
   }
 
-  // --- MANEJO DE PRESCRIPCIÓN Y RECETA DINÁMICA ---
+  // --- PRESCRIPCIÓN Y RECETA DINÁMICA ---
   const handleAddItemReceta = () => {
     setPrescripciones([
       ...prescripciones,
@@ -242,7 +286,7 @@ export default function PacientesPage() {
           <h1>Gestión de Pacientes</h1>
           <p className="subtitle">Administra los registros médicos y tutores de las mascotas</p>
         </div>
-        <button className="primary-btn" onClick={() => setShowModal(true)}>
+        <button className="primary-btn" onClick={() => { resetPacienteForm(); setShowModal(true); }}>
           <Plus size={18} />
           <span>Nuevo Paciente</span>
         </button>
@@ -292,7 +336,18 @@ export default function PacientesPage() {
               <tbody>
                 {filteredPacientes.map((p) => (
                   <tr key={p.id}>
-                    <td className="font-semibold">{p.nombre}</td>
+                    <td>
+                      <div className="patient-cell">
+                        {p.foto_url ? (
+                          <img src={p.foto_url} alt={p.nombre} className="patient-avatar" />
+                        ) : (
+                          <div className="patient-avatar-placeholder">
+                            {p.especie?.toLowerCase().includes('perro') ? <Dog size={16} /> : <Cat size={16} />}
+                          </div>
+                        )}
+                        <span className="font-semibold">{p.nombre}</span>
+                      </div>
+                    </td>
                     <td>
                       <span className={`badge ${p.especie?.toLowerCase().includes('perro') ? 'dog' : p.especie?.toLowerCase().includes('gato') ? 'cat' : 'other'}`}>
                         {p.especie?.toLowerCase().includes('perro') ? (
@@ -348,6 +403,21 @@ export default function PacientesPage() {
             </div>
 
             <form onSubmit={handleCreatePaciente} className="modal-form">
+              {/* Sección Subida e Previsualización de Foto */}
+              <div className="photo-upload-wrapper">
+                <label className="photo-upload-container">
+                  {fotoPreview ? (
+                    <img src={fotoPreview} alt="Previsualización" className="photo-preview" />
+                  ) : (
+                    <div className="photo-placeholder">
+                      <Camera size={24} color="#94a3b8" />
+                      <span>Subir Foto</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleFotoChange} hidden />
+                </label>
+              </div>
+
               <div className="form-grid">
                 <div className="form-group">
                   <label>Nombre de la Mascota *</label>
@@ -445,11 +515,20 @@ export default function PacientesPage() {
         <div className="modal-overlay no-print" onClick={() => setShowHistorialModal(false)}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div>
-                <h2>Ficha Clínica: {selectedPaciente.nombre}</h2>
-                <p className="modal-subtitle">
-                  {selectedPaciente.especie} {selectedPaciente.raza ? `• ${selectedPaciente.raza}` : ''} | Tutor: {selectedPaciente.tutor}
-                </p>
+              <div className="header-patient-info">
+                {selectedPaciente.foto_url ? (
+                  <img src={selectedPaciente.foto_url} alt={selectedPaciente.nombre} className="modal-patient-avatar" />
+                ) : (
+                  <div className="modal-patient-placeholder">
+                    {selectedPaciente.especie?.toLowerCase().includes('perro') ? <Dog size={20} /> : <Cat size={20} />}
+                  </div>
+                )}
+                <div>
+                  <h2>Ficha Clínica: {selectedPaciente.nombre}</h2>
+                  <p className="modal-subtitle">
+                    {selectedPaciente.especie} {selectedPaciente.raza ? `• ${selectedPaciente.raza}` : ''} | Tutor: {selectedPaciente.tutor}
+                  </p>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <button
@@ -597,7 +676,7 @@ export default function PacientesPage() {
         </div>
       )}
 
-      {/* MODAL FORMULARIO DINÁMICO DE RECETA Y VISTA PREVIA IMPRESIÓN */}
+      {/* MODAL RECETA */}
       {showRecetaModal && selectedPaciente && (
         <div className="modal-overlay" onClick={() => setShowRecetaModal(false)}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
@@ -608,7 +687,6 @@ export default function PacientesPage() {
               </button>
             </div>
 
-            {/* Formulario Dinámico de Prescripción */}
             <div className="receta-form-container no-print">
               <h3>Medicamentos / Tratamiento</h3>
               {prescripciones.map((p, idx) => (
@@ -676,7 +754,7 @@ export default function PacientesPage() {
               </div>
             </div>
 
-            {/* FORMATO OFICIAL IMPRESO */}
+            {/* HOJA IMPRESA */}
             <div className="official-prescription-sheet">
               <header className="sheet-header">
                 <div>
@@ -850,6 +928,31 @@ export default function PacientesPage() {
           border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
+        .patient-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .patient-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .patient-avatar-placeholder {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.05);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+        }
+
         .font-semibold {
           font-weight: 600;
           color: #f8fafc !important;
@@ -926,10 +1029,12 @@ export default function PacientesPage() {
           to { transform: rotate(360deg); }
         }
 
-        /* Modales */
         .modal-overlay {
           position: fixed;
-          inset: 0;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
           background: rgba(0, 0, 0, 0.7);
           backdrop-filter: blur(4px);
           display: flex;
@@ -944,7 +1049,7 @@ export default function PacientesPage() {
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 20px;
           width: 100%;
-          max-width: 520px;
+          max-width: 540px;
           max-height: 90vh;
           overflow-y: auto;
           padding: 24px;
@@ -952,7 +1057,7 @@ export default function PacientesPage() {
         }
 
         .large-modal {
-          max-width: 850px;
+          max-width: 900px;
         }
 
         .modal-header {
@@ -962,8 +1067,34 @@ export default function PacientesPage() {
           margin-bottom: 20px;
         }
 
+        .header-patient-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .modal-patient-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-patient-placeholder {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.05);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+        }
+
         .modal-header h2 {
           font-size: 20px;
+          font-weight: 700;
           color: #f8fafc;
           margin: 0;
         }
@@ -977,23 +1108,71 @@ export default function PacientesPage() {
         .close-btn {
           background: none;
           border: none;
-          color: #64748b;
+          color: #94a3b8;
           cursor: pointer;
+          padding: 4px;
+          border-radius: 6px;
         }
 
         .close-btn:hover {
           color: #f8fafc;
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Foto upload styles */
+        .photo-upload-wrapper {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 16px;
+        }
+
+        .photo-upload-container {
+          width: 90px;
+          height: 90px;
+          border-radius: 50%;
+          border: 2px dashed rgba(255, 255, 255, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          overflow: hidden;
+          transition: border-color 0.2s ease;
+        }
+
+        .photo-upload-container:hover {
+          border-color: #10b981;
+        }
+
+        .photo-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          color: #94a3b8;
+          font-size: 11px;
+        }
+
+        .photo-preview {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .modal-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
         }
 
         .form-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, 1fr);
           gap: 16px;
         }
 
         .form-grid-2 {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, 1fr);
           gap: 12px;
         }
 
@@ -1006,44 +1185,49 @@ export default function PacientesPage() {
         .form-group label {
           font-size: 12px;
           font-weight: 600;
-          color: #94a3b8;
+          color: #cbd5e1;
         }
 
         .input-wrapper {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(30, 41, 59, 0.6);
+          background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 10px;
           padding: 10px 12px;
         }
 
         .input-wrapper input {
+          width: 100%;
           background: none;
           border: none;
           color: #f8fafc;
-          width: 100%;
-          outline: none;
           font-size: 14px;
+          outline: none;
         }
 
         .select-input, .text-input, .textarea-input {
-          background: rgba(30, 41, 59, 0.6);
+          background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 10px;
           padding: 10px 12px;
           color: #f8fafc;
-          outline: none;
           font-size: 14px;
+          outline: none;
           width: 100%;
+        }
+
+        .select-input option {
+          background: #0f172a;
+          color: #f8fafc;
         }
 
         .modal-actions {
           display: flex;
           justify-content: flex-end;
           gap: 12px;
-          margin-top: 24px;
+          margin-top: 8px;
         }
 
         .cancel-btn {
@@ -1052,6 +1236,8 @@ export default function PacientesPage() {
           border: none;
           padding: 10px 18px;
           border-radius: 10px;
+          font-size: 14px;
+          font-weight: 600;
           cursor: pointer;
         }
 
@@ -1061,11 +1247,14 @@ export default function PacientesPage() {
           border: none;
           padding: 10px 18px;
           border-radius: 10px;
+          font-size: 14px;
           font-weight: 600;
           cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        /* Historial */
         .historial-body {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1073,19 +1262,21 @@ export default function PacientesPage() {
         }
 
         .consulta-form-card, .consultas-list-card {
-          background: rgba(30, 41, 59, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
           border-radius: 14px;
-          padding: 16px;
+          padding: 18px;
         }
 
         .consulta-form-card h3, .consultas-list-card h3 {
           font-size: 15px;
+          font-weight: 600;
           color: #f8fafc;
+          margin-top: 0;
+          margin-bottom: 16px;
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-bottom: 14px;
         }
 
         .consultas-timeline {
@@ -1097,8 +1288,8 @@ export default function PacientesPage() {
         }
 
         .timeline-item {
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
           border-radius: 10px;
           padding: 12px;
         }
@@ -1107,13 +1298,13 @@ export default function PacientesPage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
 
         .timeline-date {
           font-size: 11px;
-          color: #3b82f6;
-          font-weight: 600;
+          font-weight: 700;
+          color: #10b981;
         }
 
         .timeline-motivo {
@@ -1123,8 +1314,8 @@ export default function PacientesPage() {
         }
 
         .timeline-content p {
-          font-size: 12px;
-          color: #94a3b8;
+          font-size: 13px;
+          color: #cbd5e1;
           margin: 4px 0;
         }
 
@@ -1132,7 +1323,7 @@ export default function PacientesPage() {
           display: flex;
           gap: 12px;
           font-size: 12px;
-          color: #10b981;
+          color: #94a3b8;
           margin-top: 6px;
         }
 
@@ -1142,10 +1333,15 @@ export default function PacientesPage() {
           gap: 4px;
         }
 
-        /* Formulario Receta Dinámica */
+        .timeline-notas {
+          font-style: italic;
+          color: #94a3b8 !important;
+          font-size: 12px !important;
+        }
+
         .prescripcion-row {
           display: grid;
-          grid-template-columns: 2fr 1.5fr 1.5fr 1fr auto;
+          grid-template-columns: 2fr 1fr 1fr 1fr auto;
           gap: 8px;
           margin-bottom: 8px;
           align-items: center;
@@ -1158,6 +1354,7 @@ export default function PacientesPage() {
           padding: 8px 14px;
           border-radius: 8px;
           font-size: 13px;
+          font-weight: 600;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -1165,173 +1362,133 @@ export default function PacientesPage() {
           margin-top: 8px;
         }
 
-        /* Hoja de Prescripción Oficial */
         .official-prescription-sheet {
-          background: white;
-          color: #1e293b;
-          padding: 30px;
-          border-radius: 12px;
-          margin-top: 20px;
+          display: none;
         }
 
-        .sheet-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-        }
-
-        .clinic-title {
-          font-size: 20px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-        }
-
-        .clinic-sub {
-          font-size: 12px;
-          color: #64748b;
-          margin-top: 2px;
-        }
-
-        .clinic-contact {
-          font-size: 12px;
-          text-align: right;
-          color: #475569;
-        }
-
-        .divider {
-          border: none;
-          border-top: 1px solid #e2e8f0;
-          margin: 16px 0;
-        }
-
-        .patient-info-block {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          font-size: 13px;
-          color: #334155;
-        }
-
-        .prescription-body {
-          margin-top: 20px;
-        }
-
-        .prescription-body h2 {
-          font-size: 16px;
-          text-align: center;
-          letter-spacing: 1px;
-          margin-bottom: 16px;
-          color: #0f172a;
-        }
-
-        .prescription-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-        }
-
-        .prescription-table th {
-          background: #f8fafc;
-          border-bottom: 2px solid #cbd5e1;
-          padding: 8px;
-          font-size: 12px;
-          text-align: left;
-          color: #475569;
-        }
-
-        .prescription-table td {
-          border-bottom: 1px solid #e2e8f0;
-          padding: 10px 8px;
-          font-size: 13px;
-          color: #1e293b;
-        }
-
-        .general-notes {
-          background: #f8fafc;
-          padding: 12px;
-          border-radius: 8px;
-          border-left: 4px solid #3b82f6;
-          margin-top: 16px;
-        }
-
-        .general-notes h3 {
-          font-size: 13px;
-          margin: 0 0 6px 0;
-          color: #1e293b;
-        }
-
-        .general-notes p {
-          font-size: 12px;
-          margin: 0;
-          color: #475569;
-        }
-
-        .sheet-footer {
-          margin-top: 50px;
-          display: flex;
-          justify-content: flex-end;
-        }
-
-        .signature-box {
-          text-align: center;
-          width: 220px;
-        }
-
-        .signature-box .line {
-          border-top: 1px solid #94a3b8;
-          margin-bottom: 6px;
-        }
-
-        .signature-box p {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-        }
-
-        /* Estilos de Impresión */
         @media print {
-          body * {
-            visibility: hidden;
-          }
-
           .no-print {
             display: none !important;
           }
 
+          body {
+            background: white !important;
+            color: black !important;
+          }
+
           .modal-overlay {
             position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: none !important;
-            backdrop-filter: none !important;
-            padding: 0 !important;
+            background: white;
+            padding: 0;
           }
 
           .modal-content {
-            background: white !important;
-            box-shadow: none !important;
-            border: none !important;
-            max-width: 100% !important;
-            padding: 0 !important;
-            max-height: none !important;
-            overflow: visible !important;
-          }
-
-          .official-prescription-sheet,
-          .official-prescription-sheet * {
-            visibility: visible;
+            border: none;
+            box-shadow: none;
+            background: white;
+            max-width: 100%;
+            padding: 0;
           }
 
           .official-prescription-sheet {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
+            display: block;
             padding: 20px;
+            color: #000;
+            background: white;
+            font-family: Arial, sans-serif;
+          }
+
+          .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+
+          .clinic-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #0f172a;
+            margin: 0;
+          }
+
+          .clinic-sub {
+            font-size: 12px;
+            color: #475569;
+            margin: 2px 0 0 0;
+          }
+
+          .clinic-contact {
+            text-align: right;
+            font-size: 12px;
+            color: #475569;
+          }
+
+          .divider {
+            border: none;
+            border-top: 1px solid #ccc;
+            margin: 15px 0;
+          }
+
+          .patient-info-block {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 13px;
+          }
+
+          .prescription-body h2 {
+            font-size: 16px;
+            text-align: center;
+            margin: 20px 0 15px 0;
+            letter-spacing: 1px;
+          }
+
+          .prescription-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+
+          .prescription-table th, .prescription-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 12px;
+          }
+
+          .prescription-table th {
+            background-color: #f8fafc;
+          }
+
+          .general-notes {
+            margin-top: 20px;
+            font-size: 12px;
+          }
+
+          .general-notes h3 {
+            font-size: 13px;
+            margin-bottom: 5px;
+          }
+
+          .sheet-footer {
+            margin-top: 80px;
+            display: flex;
+            justify-content: flex-end;
+          }
+
+          .signature-box {
+            text-align: center;
+            width: 200px;
+          }
+
+          .signature-box .line {
+            border-top: 1px solid #000;
+            margin-bottom: 5px;
+          }
+
+          .signature-box p {
+            font-size: 11px;
+            margin: 0;
           }
         }
       `}</style>
