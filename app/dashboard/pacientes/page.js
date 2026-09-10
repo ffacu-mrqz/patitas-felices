@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase/client'
+import { uploadImage } from '../../../lib/supabase/storage'
 import {
   Search,
   Plus,
@@ -89,7 +90,6 @@ export default function PacientesPage() {
     fetchPacientes()
   }, [fetchPacientes])
 
-  // --- MANEJO DE FOTO Y SUBIDA A SUPABASE STORAGE ---
   const handleFotoChange = (e) => {
     const file = e.target.files[0]
     if (file) {
@@ -100,23 +100,7 @@ export default function PacientesPage() {
 
   const uploadFotoMascota = async (file) => {
     if (!file) return null
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `${fileName}`
-
-    // CORRECCIÓN: Usar un único bucket consistente ('mascotas')
-    const { error: uploadError } = await supabase.storage
-      .from('mascotas')
-      .upload(filePath, file)
-
-    if (uploadError) throw uploadError
-
-    // CORRECCIÓN: Estructura correcta del getPublicUrl en Supabase v2
-    const { data } = supabase.storage
-      .from('mascotas')
-      .getPublicUrl(filePath)
-
-    return data.publicUrl
+    return uploadImage(file, { bucket: 'mascotas', folder: 'pacientes' })
   }
 
   const handleCreatePaciente = async (e) => {

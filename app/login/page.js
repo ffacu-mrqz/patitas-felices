@@ -24,7 +24,7 @@ export default function LoginPage() {
       email,
       password,
     })
-
+    console.log("EL ERROR REAL ES:", error);
     if (error) {
       setErrorMsg('Credenciales inválidas. Verifica tu correo y contraseña.')
       setLoading(false)
