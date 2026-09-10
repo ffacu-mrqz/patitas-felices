@@ -22,8 +22,7 @@ import {
   ClipboardList,
   Printer,
   Pill,
-  Camera,
-  Image as ImageIcon
+  Camera
 } from 'lucide-react'
 
 export default function PacientesPage() {
@@ -63,7 +62,7 @@ export default function PacientesPage() {
   const [notas, setNotas] = useState('')
   const [submittingConsulta, setSubmittingConsulta] = useState(false)
 
-  // Estado Formulario Dinámico de Receta / Prescripción
+  // Estado Formulario Dinámico de Receta
   const [prescripciones, setPrescripciones] = useState([
     { medicamento: '', dosis: '', frecuencia: '', duracion: '' }
   ])
@@ -103,16 +102,18 @@ export default function PacientesPage() {
     if (!file) return null
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `pacientes/${fileName}`
+    const filePath = `${fileName}`
 
+    // CORRECCIÓN: Usar un único bucket consistente ('mascotas')
     const { error: uploadError } = await supabase.storage
-      .from('pacientes-fotos')
+      .from('mascotas')
       .upload(filePath, file)
 
     if (uploadError) throw uploadError
 
+    // CORRECCIÓN: Estructura correcta del getPublicUrl en Supabase v2
     const { data } = supabase.storage
-      .from('pacientes-fotos')
+      .from('mascotas')
       .getPublicUrl(filePath)
 
     return data.publicUrl
@@ -403,7 +404,6 @@ export default function PacientesPage() {
             </div>
 
             <form onSubmit={handleCreatePaciente} className="modal-form">
-              {/* Sección Subida e Previsualización de Foto */}
               <div className="photo-upload-wrapper">
                 <label className="photo-upload-container">
                   {fotoPreview ? (
@@ -545,7 +545,6 @@ export default function PacientesPage() {
             </div>
 
             <div className="historial-body">
-              {/* Formulario Nueva Consulta */}
               <div className="consulta-form-card">
                 <h3><Stethoscope size={18} /> Registrar Nueva Consulta</h3>
                 <form onSubmit={handleCreateConsulta}>
@@ -630,7 +629,6 @@ export default function PacientesPage() {
                 </form>
               </div>
 
-              {/* Lista de Consultas Previas */}
               <div className="consultas-list-card">
                 <h3><ClipboardList size={18} /> Historial de Atenciones</h3>
                 {loadingHistorial ? (
@@ -874,33 +872,33 @@ export default function PacientesPage() {
           display: flex;
           align-items: center;
           gap: 12px;
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 14px;
-          padding: 12px 16px;
+          background: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 12px;
+          padding: 10px 16px;
         }
 
         .search-bar-container input {
-          width: 100%;
-          background: none;
+          background: transparent;
           border: none;
-          color: #f8fafc;
-          font-size: 14px;
           outline: none;
+          color: #f8fafc;
+          width: 100%;
+          font-size: 14px;
         }
 
         .clear-btn {
-          background: none;
+          background: transparent;
           border: none;
           color: #94a3b8;
           cursor: pointer;
         }
 
         .table-card {
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: #1e293b;
+          border: 1px solid #334155;
           border-radius: 16px;
-          padding: 10px;
+          overflow: hidden;
         }
 
         .table-responsive {
@@ -911,21 +909,21 @@ export default function PacientesPage() {
           width: 100%;
           border-collapse: collapse;
           text-align: left;
+          font-size: 14px;
+          color: #cbd5e1;
         }
 
         .custom-table th {
-          padding: 14px;
-          font-size: 12px;
-          text-transform: uppercase;
-          color: #64748b;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          background: #0f172a;
+          padding: 14px 16px;
+          font-weight: 600;
+          color: #94a3b8;
+          border-bottom: 1px solid #334155;
         }
 
         .custom-table td {
-          padding: 14px;
-          font-size: 14px;
-          color: #cbd5e1;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          padding: 14px 16px;
+          border-bottom: 1px solid #334155;
         }
 
         .patient-cell {
@@ -939,23 +937,17 @@ export default function PacientesPage() {
           height: 36px;
           border-radius: 50%;
           object-fit: cover;
-          border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .patient-avatar-placeholder {
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.05);
+          background: #334155;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #94a3b8;
-        }
-
-        .font-semibold {
-          font-weight: 600;
-          color: #f8fafc !important;
         }
 
         .badge {
@@ -968,13 +960,23 @@ export default function PacientesPage() {
           font-weight: 600;
         }
 
-        .badge.dog { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-        .badge.cat { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-        .badge.other { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+        .badge.dog {
+          background: rgba(59, 130, 246, 0.15);
+          color: #60a5fa;
+        }
+
+        .badge.cat {
+          background: rgba(168, 85, 247, 0.15);
+          color: #c084fc;
+        }
+
+        .badge.other {
+          background: rgba(234, 179, 8, 0.15);
+          color: #facc15;
+        }
 
         .actions-cell {
           display: flex;
-          align-items: center;
           justify-content: flex-end;
           gap: 8px;
         }
@@ -985,25 +987,25 @@ export default function PacientesPage() {
           gap: 6px;
           padding: 6px 12px;
           border-radius: 8px;
+          border: 1px solid transparent;
           font-size: 13px;
-          font-weight: 500;
           cursor: pointer;
-          border: none;
           transition: all 0.2s ease;
         }
 
         .history-btn {
-          background: rgba(59, 130, 246, 0.1);
-          color: #60a5fa;
+          background: #334155;
+          color: #f8fafc;
         }
 
         .history-btn:hover {
-          background: rgba(59, 130, 246, 0.2);
+          background: #475569;
         }
 
         .delete-btn {
           background: rgba(239, 68, 68, 0.1);
           color: #f87171;
+          border-color: rgba(239, 68, 68, 0.2);
         }
 
         .delete-btn:hover {
@@ -1029,6 +1031,7 @@ export default function PacientesPage() {
           to { transform: rotate(360deg); }
         }
 
+        /* Modal Styles */
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -1040,128 +1043,81 @@ export default function PacientesPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 50;
+          z-index: 1000;
           padding: 20px;
         }
 
         .modal-content {
-          background: #0f172a;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
+          background: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 16px;
           width: 100%;
-          max-width: 540px;
+          max-width: 550px;
           max-height: 90vh;
           overflow-y: auto;
-          padding: 24px;
           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
         }
 
-        .large-modal {
-          max-width: 900px;
+        .modal-content.large-modal {
+          max-width: 800px;
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 20px;
-        }
-
-        .header-patient-info {
-          display: flex;
           align-items: center;
-          gap: 12px;
-        }
-
-        .modal-patient-avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .modal-patient-placeholder {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.05);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #94a3b8;
+          padding: 20px;
+          border-bottom: 1px solid #334155;
         }
 
         .modal-header h2 {
-          font-size: 20px;
+          font-size: 18px;
           font-weight: 700;
           color: #f8fafc;
           margin: 0;
         }
 
-        .modal-subtitle {
-          font-size: 13px;
-          color: #94a3b8;
-          margin-top: 4px;
-        }
-
         .close-btn {
-          background: none;
+          background: transparent;
           border: none;
           color: #94a3b8;
           cursor: pointer;
-          padding: 4px;
-          border-radius: 6px;
-        }
-
-        .close-btn:hover {
-          color: #f8fafc;
-          background: rgba(255, 255, 255, 0.05);
-        }
-
-        /* Foto upload styles */
-        .photo-upload-wrapper {
-          display: flex;
-          justify-content: center;
-          margin-bottom: 16px;
-        }
-
-        .photo-upload-container {
-          width: 90px;
-          height: 90px;
-          border-radius: 50%;
-          border: 2px dashed rgba(255, 255, 255, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          overflow: hidden;
-          transition: border-color 0.2s ease;
-        }
-
-        .photo-upload-container:hover {
-          border-color: #10b981;
-        }
-
-        .photo-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-          color: #94a3b8;
-          font-size: 11px;
-        }
-
-        .photo-preview {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
         }
 
         .modal-form {
+          padding: 20px;
+        }
+
+        .photo-upload-wrapper {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 20px;
+        }
+
+        .photo-upload-container {
+          cursor: pointer;
+        }
+
+        .photo-preview {
+          width: 90px;
+          height: 90px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid #10b981;
+        }
+
+        .photo-placeholder {
+          width: 90px;
+          height: 90px;
+          border-radius: 50%;
+          border: 2px dashed #475569;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          color: #94a3b8;
+          font-size: 11px;
         }
 
         .form-grid {
@@ -1185,69 +1141,61 @@ export default function PacientesPage() {
         .form-group label {
           font-size: 12px;
           font-weight: 600;
-          color: #cbd5e1;
+          color: #94a3b8;
         }
 
         .input-wrapper {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px;
-          padding: 10px 12px;
+          background: #0f172a;
+          border: 1px solid #334155;
+          border-radius: 8px;
+          padding: 8px 12px;
         }
 
         .input-wrapper input {
-          width: 100%;
-          background: none;
+          background: transparent;
           border: none;
-          color: #f8fafc;
-          font-size: 14px;
           outline: none;
+          color: #f8fafc;
+          width: 100%;
+          font-size: 14px;
         }
 
         .select-input, .text-input, .textarea-input {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px;
-          padding: 10px 12px;
+          background: #0f172a;
+          border: 1px solid #334155;
+          border-radius: 8px;
+          padding: 8px 12px;
           color: #f8fafc;
           font-size: 14px;
           outline: none;
           width: 100%;
-        }
-
-        .select-input option {
-          background: #0f172a;
-          color: #f8fafc;
         }
 
         .modal-actions {
           display: flex;
           justify-content: flex-end;
           gap: 12px;
-          margin-top: 8px;
+          margin-top: 24px;
         }
 
         .cancel-btn {
-          background: rgba(255, 255, 255, 0.05);
+          background: transparent;
+          border: 1px solid #334155;
           color: #cbd5e1;
-          border: none;
-          padding: 10px 18px;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 600;
+          padding: 8px 16px;
+          border-radius: 8px;
           cursor: pointer;
         }
 
         .submit-btn {
           background: #10b981;
-          color: white;
           border: none;
-          padding: 10px 18px;
-          border-radius: 10px;
-          font-size: 14px;
+          color: white;
+          padding: 8px 16px;
+          border-radius: 8px;
           font-weight: 600;
           cursor: pointer;
           display: flex;
@@ -1255,25 +1203,55 @@ export default function PacientesPage() {
           justify-content: center;
         }
 
+        .header-patient-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .modal-patient-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          object-fit: cover;
+        }
+
+        .modal-patient-placeholder {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: #334155;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+        }
+
+        .modal-subtitle {
+          font-size: 12px;
+          color: #94a3b8;
+          margin: 0;
+        }
+
         .historial-body {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
           gap: 20px;
         }
 
         .consulta-form-card, .consultas-list-card {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 14px;
-          padding: 18px;
+          background: #0f172a;
+          border: 1px solid #334155;
+          border-radius: 12px;
+          padding: 16px;
         }
 
         .consulta-form-card h3, .consultas-list-card h3 {
           font-size: 15px;
-          font-weight: 600;
           color: #f8fafc;
           margin-top: 0;
-          margin-bottom: 16px;
+          margin-bottom: 14px;
           display: flex;
           align-items: center;
           gap: 8px;
@@ -1283,28 +1261,25 @@ export default function PacientesPage() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          max-height: 400px;
-          overflow-y: auto;
         }
 
         .timeline-item {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 10px;
+          background: #1e293b;
+          border-left: 3px solid #10b981;
+          border-radius: 0 8px 8px 0;
           padding: 12px;
         }
 
         .timeline-header {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
+          gap: 12px;
+          margin-bottom: 6px;
         }
 
         .timeline-date {
-          font-size: 11px;
-          font-weight: 700;
+          font-size: 12px;
           color: #10b981;
+          font-weight: 600;
         }
 
         .timeline-motivo {
@@ -1314,17 +1289,17 @@ export default function PacientesPage() {
         }
 
         .timeline-content p {
+          margin: 4px 0;
           font-size: 13px;
           color: #cbd5e1;
-          margin: 4px 0;
         }
 
         .timeline-vitals {
           display: flex;
-          gap: 12px;
+          gap: 16px;
+          margin-top: 6px;
           font-size: 12px;
           color: #94a3b8;
-          margin-top: 6px;
         }
 
         .timeline-vitals span {
@@ -1336,7 +1311,11 @@ export default function PacientesPage() {
         .timeline-notas {
           font-style: italic;
           color: #94a3b8 !important;
-          font-size: 12px !important;
+        }
+
+        /* Prescripciones / Recetas */
+        .receta-form-container {
+          padding: 20px;
         }
 
         .prescripcion-row {
@@ -1344,58 +1323,66 @@ export default function PacientesPage() {
           grid-template-columns: 2fr 1fr 1fr 1fr auto;
           gap: 8px;
           margin-bottom: 8px;
-          align-items: center;
         }
 
         .add-row-btn {
-          background: rgba(59, 130, 246, 0.1);
+          background: transparent;
+          border: 1px dashed #334155;
           color: #60a5fa;
-          border: 1px dashed rgba(59, 130, 246, 0.3);
-          padding: 8px 14px;
+          width: 100%;
+          padding: 8px;
           border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
           cursor: pointer;
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
+          font-size: 13px;
           margin-top: 8px;
         }
 
+        /* HOJA IMPRESA - ESTILOS PREDETERMINADOS Y PRINT */
         .official-prescription-sheet {
           display: none;
+          background: white;
+          color: black;
+          padding: 40px;
+          font-family: Arial, sans-serif;
         }
 
         @media print {
+          body * {
+            visibility: hidden;
+          }
+
           .no-print {
             display: none !important;
           }
 
-          body {
-            background: white !important;
-            color: black !important;
-          }
-
           .modal-overlay {
             position: absolute;
-            background: white;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: auto;
+            background: white !important;
             padding: 0;
           }
 
           .modal-content {
-            border: none;
-            box-shadow: none;
-            background: white;
-            max-width: 100%;
-            padding: 0;
+            box-shadow: none !important;
+            border: none !important;
+            background: white !important;
+            max-width: 100% !important;
           }
 
           .official-prescription-sheet {
-            display: block;
-            padding: 20px;
-            color: #000;
-            background: white;
-            font-family: Arial, sans-serif;
+            display: block !important;
+            visibility: visible;
+          }
+
+          .official-prescription-sheet * {
+            visibility: visible;
           }
 
           .sheet-header {
@@ -1405,22 +1392,22 @@ export default function PacientesPage() {
           }
 
           .clinic-title {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
-            color: #0f172a;
             margin: 0;
+            color: #000;
           }
 
           .clinic-sub {
             font-size: 12px;
-            color: #475569;
+            color: #555;
             margin: 2px 0 0 0;
           }
 
-          .clinic-contact {
-            text-align: right;
+          .clinic-contact p {
+            margin: 2px 0;
             font-size: 12px;
-            color: #475569;
+            text-align: right;
           }
 
           .divider {
@@ -1431,15 +1418,15 @@ export default function PacientesPage() {
 
           .patient-info-block {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
             font-size: 13px;
           }
 
           .prescription-body h2 {
             font-size: 16px;
             text-align: center;
-            margin: 20px 0 15px 0;
+            margin: 20px 0;
             letter-spacing: 1px;
           }
 
@@ -1451,13 +1438,13 @@ export default function PacientesPage() {
 
           .prescription-table th, .prescription-table td {
             border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
+            padding: 8px;
             font-size: 12px;
+            text-align: left;
           }
 
           .prescription-table th {
-            background-color: #f8fafc;
+            background-color: #f2f2f2;
           }
 
           .general-notes {
@@ -1467,7 +1454,7 @@ export default function PacientesPage() {
 
           .general-notes h3 {
             font-size: 13px;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
           }
 
           .sheet-footer {
@@ -1483,7 +1470,7 @@ export default function PacientesPage() {
 
           .signature-box .line {
             border-top: 1px solid #000;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
           }
 
           .signature-box p {
